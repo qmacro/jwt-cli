@@ -3,7 +3,22 @@
 var colors = require('colors/safe');
 var json = require('format-json');
 var jwt = require('jsonwebtoken');
-var parseArgs = require('minimist');
+
+const commandLineArgs = require('command-line-args');
+const options = commandLineArgs([
+  { name: 'url',       alias: 'u', type: Boolean },
+  { name: 'header',    alias: 'h', type: Boolean },
+  { name: 'payload',   alias: 'p', type: Boolean },
+  { name: 'validity',  alias: 'v', type: Boolean },
+  { name: 'signature', alias: 'i', type: Boolean },
+  { name: 'raw',       alias: 'r', type: Boolean },
+  { name: 'secret',    alias: 's', type: String },
+  { name: 'token',     alias: 't', type: String, defaultOption: true }
+], { partial: true} );
+
+// Set special 'all' if no section options were specified
+options.all = ! ['url', 'header', 'payload', 'validity', 'signature'].some(x => options.hasOwnProperty(x))
+options.cooked = options.all || ! options.raw
 
 function niceDate(unixTimestamp) {
   var dateString;
@@ -20,7 +35,7 @@ function processToken(token) {
     const pkg = require('../package.json');
     console.log(`jwt-cli - JSON Web Token parser [version ${pkg.version}]\n`);
     console.info(
-      colors.yellow('Usage: jwt <encoded token> --secret=<signing secret>\n')
+      colors.yellow('Usage: jwt <encoded token> --secret=<signing secret> [--verifyurl] [--header] [--payload] [--validity] [--signature] [--raw]\n')
     );
     console.log('ℹ Documentation: https://www.npmjs.com/package/jwt-cli');
     console.log(
@@ -37,33 +52,44 @@ function processToken(token) {
     return false;
   }
 
-  console.log(colors.yellow('\nTo verify on jwt.io:'));
-  console.log(
-    '\n' +
-      colors.magenta('https://jwt.io/#id_token=') +
-      colors.cyan(token.parts[0]) +
-      '.' +
-      colors.yellow(token.parts[1]) +
-      '.' +
-      colors.magenta(token.parts[2])
-  );
+  if (options.all || options.url) {
+    console.log(colors.yellow('\nTo verify on jwt.io:'));
+    console.log(
+      '\n' +
+        colors.magenta('https://jwt.io/#id_token=') +
+        colors.cyan(token.parts[0]) +
+        '.' +
+        colors.yellow(token.parts[1]) +
+        '.' +
+        colors.magenta(token.parts[2])
+    );
+  }
 
-  console.log(colors.cyan('\n✻ Header'));
-  console.log(colors.cyan(json.plain(token.decoded.header)));
+  if (options.all || options.header) {
+    options.cooked && console.log(colors.cyan('\n✻ Header'));
+    console.log(colors.cyan(json.plain(token.decoded.header)));
+  }
 
-  console.log(colors.yellow('\n✻ Payload'));
-  console.log(colors.yellow(json.plain(token.decoded.payload)));
+  if (options.all || options.payload) {
+    options.cooked && console.log(colors.yellow('\n✻ Payload'));
+    console.log(colors.yellow(json.plain(token.decoded.payload)));
+  }
 
-  const dates = { iat: 'Issued At', nbf: 'Not Before', exp: 'Expiration Time' };
-  for (const [field, name] of Object.entries(dates)) {
-    if (Object.prototype.hasOwnProperty.call(token.decoded.payload, field)) {
-      console.log(
-        colors.yellow(`   ${name}: `) + niceDate(token.decoded.payload[field])
-      );
+  if (options.all || options.validity) {
+    const dates = { iat: 'Issued At', nbf: 'Not Before', exp: 'Expiration Time' };
+    for (const [field, name] of Object.entries(dates)) {
+      if (Object.prototype.hasOwnProperty.call(token.decoded.payload, field)) {
+        console.log(
+          colors.yellow(`   ${name}: `) + niceDate(token.decoded.payload[field])
+        );
+      }
     }
   }
 
-  console.log(colors.magenta('\n✻ Signature ' + token.decoded.signature));
+  if (options.all || options.signature) {
+    options.cooked && console.log(colors.magenta('\n✻ Signature '));
+    console.log(token.decoded.signature);
+  }
   return true;
 }
 
@@ -77,11 +103,10 @@ function verifyToken(token, secret) {
 }
 
 function handleTokenAsAnArg() {
-  const argv = parseArgs(process.argv.slice(2));
-  token.string = argv._[0];
+  token.string = options.token;
   token.isValid = processToken(token);
-  if (token.isValid && argv.secret) {
-    verifyToken(token, argv.secret);
+  if (token.isValid && options.secret) {
+    verifyToken(token, options.secret);
   }
 }
 
