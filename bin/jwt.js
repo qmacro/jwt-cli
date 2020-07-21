@@ -20,6 +20,8 @@ const options = commandLineArgs([
 options.all = ! ['url', 'header', 'payload', 'validity', 'signature'].some(x => options.hasOwnProperty(x))
 options.cooked = options.all || ! options.raw
 
+const color = (data, color) => color ? colors[color](data) : data
+
 function niceDate(unixTimestamp) {
   var dateString;
   if (typeof unixTimestamp === 'number' && !isNaN(unixTimestamp)) {
@@ -67,12 +69,12 @@ function processToken(token) {
 
   if (options.all || options.header) {
     options.cooked && console.log(colors.cyan('\n✻ Header'));
-    console.log(colors.cyan(json.plain(token.decoded.header)));
+    console.log(color(json.plain(token.decoded.header), options.cooked && 'cyan'));
   }
 
   if (options.all || options.payload) {
     options.cooked && console.log(colors.yellow('\n✻ Payload'));
-    console.log(colors.yellow(json.plain(token.decoded.payload)));
+    console.log(color(json.plain(token.decoded.payload), options.cooked && 'yellow'));
   }
 
   if (options.all || options.validity) {
